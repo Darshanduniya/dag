@@ -1,0 +1,55 @@
+from datetime import datetime, timedelta
+import subprocess
+import logging
+
+from airflow import DAG
+from airflow.operators.python_operator import PythonOperator
+
+# Define the function to check the scheduler status
+def check_scheduler_status():
+    try:
+        # Run the systemctl command
+        result = subprocess.run(['systemctl', 'is-active', 'airflow-scheduler'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        
+        # Get the status from the command output
+        status = result.stdout.strip()
+        
+        # Log the status
+        logging.info(f"Scheduler status: {status}")
+        
+        # Raise an error if the scheduler is not active
+        if status != 'active':
+            raise Exception(f"Scheduler is not active. Current status: {status}")
+    
+    except Exception as e:
+        logging.error(f"Error checking scheduler status: {str(e)}")
+        raise
+
+# Define the default_args for the DAG
+default_args = {
+    'owner': 'airflow',
+    'depends_on_past': False,
+    'email_on_failure': False,
+    'email_on_retry': False,
+    'retries': 1,
+    'retry_delay': timedelta(minutes=5),
+}
+
+# Define the DAG
+with DAG(
+    'check_scheduler_status',
+    default_args=default_args,
+    description='A simple DAG to check the status of the Airflow scheduler',
+    schedule_interval=timedelta(minutes=10),
+    start_date=datetime(2023, 6, 24),
+    catchup=False,
+) as dag:
+
+    # Define the task using PythonOperator
+    check_scheduler_status_task = PythonOperator(
+        task_id='check_scheduler_status',
+        python_callable=check_scheduler_status,
+    )
+
+    # Set the task in the DAG
+    check_scheduler_status_task
