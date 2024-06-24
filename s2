@@ -1,0 +1,30 @@
+import subprocess
+
+
+def check_airflow_scheduler_status():
+  """Checks the status of the Airflow scheduler running with Celery executor.
+
+  Uses the `systemctl` command to get the status of the service.
+
+  Returns:
+    str: "running" if the scheduler is running, "stopped" if it's stopped,
+         or "unknown" if the status cannot be determined.
+  """
+
+  try:
+    # Shell out to systemctl to get the service status
+    output = subprocess.check_output(["systemctl", "status", "airflow-scheduler"]).decode("utf-8")
+    if "active (running)" in output:
+      return "running"
+    elif "inactive (dead)" in output:
+      return "stopped"
+    else:
+      return "unknown"
+  except subprocess.CalledProcessError:
+    # If systemctl fails, assume the status is unknown
+    return "unknown"
+
+
+if __name__ == "__main__":
+  status = check_airflow_scheduler_status()
+  print(f"Airflow scheduler status: {status}")
