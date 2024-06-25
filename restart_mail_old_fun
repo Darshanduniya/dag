@@ -1,0 +1,83 @@
+import subprocess
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+import smtplib
+
+# Replace with your email configuration (from previous code)
+MAIL_TO = "darshan@infi.com"
+MAIL_FORM = "airflow@infi.com"
+MAIL_SMTP_SERVER = "smtpna.infi.com"
+MAIL_FORMAT = "plain"
+
+
+def check_service_status(service_name):
+  """Checks the status of a service (Airflow or Redis).
+
+  Uses the `systemctl` command to get the service status.
+
+  Args:
+    service_name: The name of the service to check.
+
+  Returns:
+    str: "running" if the service is running, "stopped" if it's stopped,
+         or "unknown" if the status cannot be determined.
+  """
+
+  try:
+    # Shell out to systemctl to get the service status
+    output = subprocess.check_output(["systemctl", "status", service_name]).decode("utf-8")
+    if "active (running)" in output:
+      return "running"
+    elif "inactive (dead)" in output:
+      return "stopped"
+    else:
+      return "unknown"
+  except subprocess.CalledProcessError:
+    # If systemctl fails, assume the status is unknown
+    return "unknown"
+
+
+def restart_service(service_name):
+  """Restarts a service using sudo and the systemctl command.
+
+  Uses a specific command for Redis and the generic command for Airflow services.
+
+  Args:
+    service_name: The name of the service to restart.
+  """
+
+  restart_command = []
+  if service_name == "redis":
+    restart_command = ["sudo", "systemctl", "start", service_name]
+  else:
+    restart_command = ["sudo", "systemctl", "start", f"{service_name}.service"]
+
+  print(f"Restarting service: {' '.join(restart_command)}")  # Print the command
+  subprocess.run(restart_command)
+  print(f"{service_name.capitalize()} restarted successfully.")
+
+
+def send_email_notification(service_name):
+  """Sends an email notification about a service being down.
+
+  Uses the provided `send_mail` function.
+  """
+
+  subject = f"Airflow Service Alert: {service_name} Down"
+  body = f"The Airflow service {service_name} is currently down."
+  send_mail(subject, body)  # Call your function with appropriate arguments
+
+
+def main():
+  services = ["airflow-scheduler", "airflow-worker", "airflow-webserver", "airflow-flower", "redis"]
+  for service in services:
+    status = check_service_status(service)
+    if status in ("stopped", "unknown"):
+      send_email_notification(service)
+      restart_service(service)
+    else:
+      print(f"{service.capitalize()} status: {status}")
+
+
+if __name__ == "__main__":
+  main()
